@@ -11,6 +11,14 @@ from threading import RLock
 
 from streamlit_folium import st_folium
 
+st.set_page_config(layout="wide")
+
+# Cette fonction ne sera exécutée qu'une seule fois, puis mise en cache
+@st.cache_data
+def load_dataset(path_file_xz):
+    # Opération coûteuse, comme charger un grand CSV
+    return pd.read_csv(path_file_xz,compression="xz",delimiter=';')
+
 #d0 = lambda x:x if x>0 else 0
 #d6 = lambda x:0 if x<=6 else (x-6 if x<=30 else 24) 
 
@@ -26,10 +34,13 @@ max_date=datetime.date.today()
 # Récupération des données
 rep_data = r"C:\Users\debroizd35r\Documents\Meteo_Donnees"
 
-st.session_state.tntxm = pd.read_csv(os.path.join(rep_data,"TNTXM_TN_TM.csv"),delimiter=';')
+tntxm = load_dataset("https://calcul-rsh-bretagne.com/data/TNTXM_TN_TM.csv.xz")
+print(len(tntxm))
+#st.session_state.tntxm = pd.read_csv(os.path.join(rep_data,"TNTXM_TN_TM.csv"),delimiter=';')
 #st.session_state.tntxm = pd.read_csv("https://calcul-rsh-bretagne.com/data/TNTXM_TN_TM.csv",delimiter=';')
+
 #st.session_state.tntxm['STA'] = st.session_state.tntxm["CITY_LATLON"].apply(lambda x:x.split('_(')[0])
-st.session_state.tntxm['DOB'] = st.session_state.tntxm["AAAAMMJJ"].apply(lambda x:datetime.date(int(str(x)[:4]),int(str(x)[4:6]),int(str(x)[6:8])))
+tntxm['DOB'] = tntxm["AAAAMMJJ"].apply(lambda x:datetime.date(int(str(x)[:4]),int(str(x)[4:6]),int(str(x)[6:8])))
 
 st.session_state.rr_cumul = pd.read_csv(os.path.join(rep_data,"RR_RR_cumul.csv"),delimiter=';')
 #st.session_state.rr_cumul = pd.read_csv("https://calcul-rsh-bretagne.com/data/RR_RR_cumul.csv",delimiter=';')
@@ -37,7 +48,6 @@ st.session_state.rr_cumul = pd.read_csv(os.path.join(rep_data,"RR_RR_cumul.csv")
 st.session_state.rr_cumul['DOB'] = st.session_state.rr_cumul["AAAAMMJJ"].apply(lambda x:datetime.date(int(str(x)[:4]),int(str(x)[4:6]),int(str(x)[6:8])))
 
 
-st.set_page_config(layout="wide")
 
 col1, col2 = st.columns([1,8]) 
 with col1:
@@ -58,7 +68,9 @@ for n,sta in st.session_state.stations_df.iterrows():
  
 st_map=st_folium(m,width=800)
 
-col1, col2, col3,col4 = st.columns([1,1,0.2,1])
+#col1, col2, col3,col4 = st.columns([1,1,0.2,1])
+
+col1, right_section = st.columns([1, 2])
 
 with col1:
     with st.form(key = 'Temp'):
@@ -77,36 +89,38 @@ with col1:
         #st.write("You selected:", options)
 
         st.form_submit_button()
-with col2:
-    #st.title("Chart Data")
-    #chart_data=pd.DataFrame(np.random.randn(100,2), columns=['lat','lon'])
-    chart_data=st.session_state.tntxm[(st.session_state.tntxm['STA']==st.session_state.station) & (st.session_state.tntxm['DOB']>=dob) & (st.session_state.tntxm['DOB']<=doe)][["DOB"]+st.session_state.champs_t]
-    data_cumult=st.session_state.tntxm[(st.session_state.tntxm['STA']==st.session_state.station) & (st.session_state.tntxm['DOB']>=dob) & (st.session_state.tntxm['DOB']<=doe)]['TNTXM']
-    #chart_data = chart_data.set_index('DOB')
-    #chart_data = chart_data.rename(columns={'index': 'x'})
-    #chart_data=tntxm[(tntxm['STA']==station)]['TNTXM']
 
-    #st.subheader('Graphique')
-    #st.line_chart(chart_data)#,y_label="Evolution des températures : "
-
-    #source = pd.DataFrame(chart_data,columns=st.session_state.champs_t, index=pd.RangeIndex(len(chart_data), name='x'))
-    #source = source.reset_index().melt('x', var_name='Type', value_name='y')
-    source = pd.melt(chart_data,id_vars=['DOB'],value_vars=st.session_state.champs_t, var_name='Type', value_name='y')   
-
-    line_chart = alt.Chart(source).mark_line(interpolate='basis').encode(
-        alt.X('DOB', title='Date'),
-        alt.Y('y', title='Température'),
-        color='Type:N').properties(title='Evolution des températures : '+st.session_state.station,width=640,height=480)
-    st.altair_chart(line_chart)   
+with right_section:
+    col_chart, col_data = st.columns([1.2, 0.8],gap='large')
+    with col_chart:
+        chart_data=tntxm[(tntxm['STA']==st.session_state.station) & (tntxm['DOB']>=dob) & (tntxm['DOB']<=doe)][["DOB"]+st.session_state.champs_t]
+        st.write(chart_data)
 
 
-with col3:
-    st.empty()
+    with col_data:
+        #st.title("Chart Data")
+        #chart_data=pd.DataFrame(np.random.randn(100,2), columns=['lat','lon'])
+        data_cumult=tntxm[(tntxm['STA']==st.session_state.station) & (tntxm['DOB']>=dob) & (tntxm['DOB']<=doe)]['TNTXM']
 
-with col4:
+        #chart_data=st.session_state.tntxm[(st.session_state.tntxm['STA']==st.session_state.station) & (st.session_state.tntxm['DOB']>=dob) & (st.session_state.tntxm['DOB']<=doe)][["DOB"]+st.session_state.champs_t]
+        #data_cumult=st.session_state.tntxm[(st.session_state.tntxm['STA']==st.session_state.station) & (st.session_state.tntxm['DOB']>=dob) & (st.session_state.tntxm['DOB']<=doe)]['TNTXM']
+        #chart_data = chart_data.set_index('DOB')
+        #chart_data = chart_data.rename(columns={'index': 'x'})
+        #chart_data=tntxm[(tntxm['STA']==station)]['TNTXM']
 
-    #st.write(st.session_state.station,st.session_state.champs_t)
-    st.write(chart_data)
+        #st.subheader('Graphique')
+        #st.line_chart(chart_data)#,y_label="Evolution des températures : "
+
+        #source = pd.DataFrame(chart_data,columns=st.session_state.champs_t, index=pd.RangeIndex(len(chart_data), name='x'))
+        #source = source.reset_index().melt('x', var_name='Type', value_name='y')
+        source = pd.melt(chart_data,id_vars=['DOB'],value_vars=st.session_state.champs_t, var_name='Type', value_name='y')   
+
+        line_chart = alt.Chart(source).mark_line(interpolate='basis').encode(
+            alt.X('DOB', title='Date'),
+            alt.Y('y', title='Température'),
+            color='Type:N').properties(title='Evolution des températures : '+st.session_state.station,width=640,height=480)
+        st.altair_chart(line_chart)   
+
 
 st.write("Cumul des températures base 0 entre le ",f"{dob:%d/%m/%Y}"," et le ",f"{doe:%d/%m/%Y}"," : ",f"{data_cumult.apply(lambda x:x if x>0 else 0).sum():0.1f}", "°.")
 st.write("Cumul des températures base 6 entre le ",f"{dob:%d/%m/%Y}"," et le ",f"{doe:%d/%m/%Y}"," : ",f"{data_cumult.apply(lambda x:0 if x<=6 else (x-6 if x<=30 else 24)).sum():0.1f}", "°.")
